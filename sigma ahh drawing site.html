@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<!-- saved from url=(0031)http://127.0.0.1:5500/draw.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <title>sigma ahh drawing site</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: url('https://thumbs.dreamstime.com/b/cow-funny-green-meadow-looking-to-camera-alps-background-45723755.jpg') center center / cover no-repeat fixed;
+        }
+        #toolbar { margin-bottom: 10px; }
+        #canvas { background: #fff; border: 2px solid #333; cursor: crosshair; }
+    </style>
+</head>
+<body>
+    <h1>Draw Something!</h1>
+    <div id="toolbar">
+        <label>Color: <input type="color" id="colorPicker" value="#000000"></label>
+        <label>Brush Size: <input type="range" id="brushSize" min="1" max="30" value="5"></label>
+    <button id="clearBtn">Clear</button>
+    <button id="undoBtn">Undo</button>
+    <button id="redoBtn">Redo</button>
+    <input type="file" id="uploadBtn" accept="image/*" style="margin-left:10px;">
+    <button id="downloadBtn" style="margin-left:10px;">Download</button>
+    <input type="text" id="textInput" placeholder="Enter text" style="margin-left:10px;">
+    <button id="addTextBtn" style="margin-left:5px;">Add Text</button>
+    </div>
+    <canvas id="canvas" width="800" height="500"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+    let drawing = false;
+    let color = document.getElementById('colorPicker').value;
+    let brushSize = document.getElementById('brushSize').value;
+    const undoStack = [];
+    const redoStack = [];
+    let textToAdd = '';
+    let addTextMode = false;
+        // Handle text input and button
+        document.getElementById('textInput').addEventListener('input', (e) => {
+            textToAdd = e.target.value;
+        });
+        document.getElementById('addTextBtn').addEventListener('click', () => {
+            if (textToAdd.trim() !== '') {
+                addTextMode = true;
+                canvas.style.cursor = 'text';
+            }
+        });
+
+        // Add text to canvas on click
+        canvas.addEventListener('click', function(e) {
+            if (addTextMode && textToAdd.trim() !== '') {
+                ctx.save();
+                ctx.font = '32px Arial';
+                ctx.fillStyle = color;
+                ctx.textBaseline = 'top';
+                ctx.fillText(textToAdd, e.offsetX, e.offsetY);
+                ctx.restore();
+                addTextMode = false;
+                canvas.style.cursor = 'crosshair';
+                // Save state for undo
+                undoStack.push(canvas.toDataURL());
+                if (undoStack.length > 50) undoStack.shift();
+            }
+        });
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            drawing = true;
+            ctx.beginPath();
+            ctx.moveTo(e.offsetX, e.offsetY);
+            // Save current state for undo
+            undoStack.push(canvas.toDataURL());
+            // Clear redo stack on new draw
+            redoStack.length = 0;
+            // Limit undo stack size (optional, e.g. 50)
+            if (undoStack.length > 50) undoStack.shift();
+        });
+        canvas.addEventListener('mousemove', (e) => {
+            if (drawing) {
+                ctx.lineTo(e.offsetX, e.offsetY);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = brushSize;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
+        });
+        canvas.addEventListener('mouseup', () => {
+            drawing = false;
+        });
+        canvas.addEventListener('mouseleave', () => {
+            drawing = false;
+        });
+
+        document.getElementById('colorPicker').addEventListener('input', (e) => {
+            color = e.target.value;
+        });
+        document.getElementById('brushSize').addEventListener('input', (e) => {
+            brushSize = e.target.value;
+        });
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            clearCanvas();
+            undoStack.length = 0;
+            redoStack.length = 0;
+        });
+
+        // Upload image to canvas
+        document.getElementById('uploadBtn').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const img = new Image();
+                img.onload = function() {
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                };
+                img.src = evt.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Download canvas as image
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'my_drawing.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+        document.getElementById('undoBtn').addEventListener('click', () => {
+            if (undoStack.length > 0) {
+                const imgData = undoStack.pop();
+                redoStack.push(canvas.toDataURL());
+                const img = new Image();
+                img.onload = function() {
+                    clearCanvas();
+                    ctx.drawImage(img, 0, 0);
+                };
+                img.src = imgData;
+            }
+        });
+
+        document.getElementById('redoBtn').addEventListener('click', () => {
+            if (redoStack.length > 0) {
+                const imgData = redoStack.pop();
+                undoStack.push(canvas.toDataURL());
+                const img = new Image();
+                img.onload = function() {
+                    clearCanvas();
+                    ctx.drawImage(img, 0, 0);
+                };
+                img.src = imgData;
+            }
+        });
+    // Initialize canvas as blank (white) on page load
+    window.onload = clearCanvas;
+    </script>
+    <script>
+    // 👽 Mouse trail effect (follows mouse exactly, clones and fades)
+    const trailLength = 15;
+    const trail = [];
+    let positions = Array(trailLength).fill({x: 0, y: 0});
+    for (let i = 0; i < trailLength; i++) {
+        const el = document.createElement('span');
+        el.textContent = '👽';
+        el.style.position = 'fixed';
+        el.style.pointerEvents = 'none';
+        el.style.fontSize = '2rem';
+        el.style.transition = 'transform 0.15s linear, opacity 0.3s linear';
+        el.style.opacity = '0';
+        el.style.zIndex = 1000;
+        document.body.appendChild(el);
+        trail.push(el);
+    }
+
+    let mouseX = 0, mouseY = 0;
+    document.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    function animateTrail() {
+        // Shift positions backwards
+        for (let i = trailLength - 1; i > 0; i--) {
+            positions[i] = {...positions[i-1]};
+        }
+        positions[0] = {x: mouseX, y: mouseY};
+
+        // Update emoji positions and opacity
+        for (let i = 0; i < trail.length; i++) {
+            const {x, y} = positions[i];
+            trail[i].style.transform = `translate(${x}px, ${y}px)`;
+            // Fade out further emojis
+            trail[i].style.opacity = String(1 - i / trailLength);
+        }
+        requestAnimationFrame(animateTrail);
+    }
+    animateTrail();
+    </script><span style="position: fixed; pointer-events: none; font-size: 2rem; transition: transform 0.15s linear, opacity 0.3s linear; opacity: 1; z-index: 1000; transform: translate(185px, 240px);">👽</span><span style="position: fixed; pointer-events: none; font-size: 2rem; transition: transform 0.15s linear, opacity 0.3s linear; opacity: 0.933333; z-index: 1000; transform: translate(185px, 240px);">👽</span><span style="position: fixed; pointer-events: none; font-size: 2rem; transition: transform 0.15s linear, opacity 0.3s linear; opacity: 0.866667; z-index: 1000; transform: translate(185px, 240px);">👽</span><span style="position: fixed; pointer-events: none; font-size: 2rem; transition: transform 0.15s linear, opacity 0.3s linear; opacity: 0.8; z-index: 1000; transform: translate(185px, 240px);">👽</span><span style="position: fixed; pointer-events: none; font-size: 2rem; transition: transform 0.15s linear, opacity 0.3s linear; opacity: 0.733333; z-index: 1000; transform: translate(185px, 240px);">👽</span><span style="position: fixed; pointer-events: none; font-size: 2rem; transition: transform 0.15s linear, opacity 0.3s linear; opacity: 0.666667; z-index: 1000; transform: translate(185px, 240px);">👽</span><span style="position: fixed; pointer-events: none; font-size: 2rem; transition: transform 0.15s linear, opacity 0.3s linear; opacity: 0.6; z-index: 1000; transform: translate(185px, 240px);">👽</span><span style="position: fixed; pointer-events: none; font-size: 2rem; transition: transform 0.15s linear, opacity 0.3s linear; opacity: 0.533333; z-index: 1000; transform: translate(185px, 240px);">👽</span><span style="position: fixed; pointer-events: none; font-size: 2rem; transition: transform 0.15s linear, opacity 0.3s linear; opacity: 0.466667; z-index: 1000; transform: translate(185px, 240px);">👽</span><span style="position: fixed; pointer-events: none; font-size: 2rem; transition: transform 0.15s linear, opacity 0.3s linear; opacity: 0.4; z-index: 1000; transform: translate(185px, 240px);">👽</span><span style="position: fixed; pointer-events: none; font-size: 2rem; transition: transform 0.15s linear, opacity 0.3s linear; opacity: 0.333333; z-index: 1000; transform: translate(185px, 240px);">👽</span><span style="position: fixed; pointer-events: none; font-size: 2rem; transition: transform 0.15s linear, opacity 0.3s linear; opacity: 0.266667; z-index: 1000; transform: translate(185px, 240px);">👽</span><span style="position: fixed; pointer-events: none; font-size: 2rem; transition: transform 0.15s linear, opacity 0.3s linear; opacity: 0.2; z-index: 1000; transform: translate(185px, 240px);">👽</span><span style="position: fixed; pointer-events: none; font-size: 2rem; transition: transform 0.15s linear, opacity 0.3s linear; opacity: 0.133333; z-index: 1000; transform: translate(185px, 240px);">👽</span><span style="position: fixed; pointer-events: none; font-size: 2rem; transition: transform 0.15s linear, opacity 0.3s linear; opacity: 0.0666667; z-index: 1000; transform: translate(185px, 240px);">👽</span>
+<!-- Code injected by live-server -->
+<script>
+	// <![CDATA[  <-- For SVG support
+	if ('WebSocket' in window) {
+		(function () {
+			function refreshCSS() {
+				var sheets = [].slice.call(document.getElementsByTagName("link"));
+				var head = document.getElementsByTagName("head")[0];
+				for (var i = 0; i < sheets.length; ++i) {
+					var elem = sheets[i];
+					var parent = elem.parentElement || head;
+					parent.removeChild(elem);
+					var rel = elem.rel;
+					if (elem.href && typeof rel != "string" || rel.length == 0 || rel.toLowerCase() == "stylesheet") {
+						var url = elem.href.replace(/(&|\?)_cacheOverride=\d+/, '');
+						elem.href = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cacheOverride=' + (new Date().valueOf());
+					}
+					parent.appendChild(elem);
+				}
+			}
+			var protocol = window.location.protocol === 'http:' ? 'ws://' : 'wss://';
+			var address = protocol + window.location.host + window.location.pathname + '/ws';
+			var socket = new WebSocket(address);
+			socket.onmessage = function (msg) {
+				if (msg.data == 'reload') window.location.reload();
+				else if (msg.data == 'refreshcss') refreshCSS();
+			};
+			if (sessionStorage && !sessionStorage.getItem('IsThisFirstTime_Log_From_LiveServer')) {
+				console.log('Live reload enabled.');
+				sessionStorage.setItem('IsThisFirstTime_Log_From_LiveServer', true);
+			}
+		})();
+	}
+	else {
+		console.error('Upgrade your browser. This Browser is NOT supported WebSocket for Live-Reloading.');
+	}
+	// ]]>
+</script>
+
+
+</body></html>
